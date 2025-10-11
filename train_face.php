@@ -128,7 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
         .then(data => {
           console.log("Server:", data);
           statusText.textContent = "✅ Data wajah tersimpan!";
-          setTimeout(() => window.location.href = "dashboard.php", 1500);
+          setTimeout(() => window.location.href = "face_recog.php", 1500);
         })
         .catch(err => {
           console.error(err);

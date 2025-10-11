@@ -6,11 +6,11 @@ if (!isset($_SESSION['user_id'])) {
 }
 include 'db.php';
 
-$last_sale_id = 0;
-$success = "";
+ $last_sale_id = 0;
+ $success = "";
 
 // Tangkap ID meja dari URL jika ada
-$meja_id = isset($_GET['meja']) ? intval($_GET['meja']) : 0;
+ $meja_id = isset($_GET['meja']) ? intval($_GET['meja']) : 0;
 
 // PROSES BAYAR
 if (isset($_POST['bayar'])) {
@@ -72,9 +72,9 @@ if (isset($_POST['bayar'])) {
 }
 
 // Ambil menu dan kategori
-$menuRes = $conn->query("SELECT * FROM menu ORDER BY id ASC");
-$menus = [];
-$categories = [];
+ $menuRes = $conn->query("SELECT * FROM menu ORDER BY id ASC");
+ $menus = [];
+ $categories = [];
 while ($r = $menuRes->fetch_assoc()) {
     $menus[] = $r;
     if (!empty($r['category'])) $categories[$r['category']] = $r['category'];
@@ -83,183 +83,784 @@ while ($r = $menuRes->fetch_assoc()) {
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POS - Pecel Lele</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-body { background:#f5f7fb; }
-.navbar-brand { font-weight:700; }
+:root {
+    --bg-color: #ffffff;
+    --page-bg: #f7f8fa;
+    --text-color: #1a1a1a;
+    --text-muted: #6c757d;
+    --accent-color: #10b981;
+    --border-color: #e5e7eb;
+    --success-color: #22c55e;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+}
+
+/* DARK MODE */
+.dark {
+    --bg-color: #1f2937;
+    --page-bg: #111827;
+    --text-color: #f3f4f6;
+    --text-muted: #9ca3af;
+    --border-color: #374151;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--page-bg);
+    color: var(--text-color);
+    min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* NAVBAR */
+.navbar {
+    background-color: var(--bg-color);
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--text-color);
+}
+
+.navbar-brand:hover {
+    color: var(--accent-color);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.table-badge {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--accent-color);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+/* MAIN CONTENT */
+.main-container {
+    padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.page-header {
+    margin-bottom: 24px;
+}
+
+.page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.page-subtitle {
+    color: var(--text-muted);
+    font-size: 1rem;
+}
+
+/* SEARCH AND FILTER */
+.search-filter-container {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.category-dropdown {
+    position: relative;
+}
+
+.category-btn {
+    padding: 10px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: border-color 0.2s ease;
+}
+
+.category-btn:hover {
+    border-color: var(--accent-color);
+}
+
+.category-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    padding: 8px;
+    margin-top: 4px;
+    display: none;
+}
+
+.category-menu.show {
+    display: block;
+}
+
+.category-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.category-item:hover {
+    background-color: var(--page-bg);
+}
+
+.category-item.active {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--accent-color);
+}
+
+/* MENU GRID */
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
 .menu-card {
-  cursor:pointer;
-  padding:12px;
-  border-radius:12px;
-  border:1px solid rgba(0,0,0,0.06);
-  background:linear-gradient(180deg,#ffffff,#fbfcff);
-  box-shadow: 0 6px 12px rgba(18,38,63,0.04);
-  transition: transform .12s ease, box-shadow .12s ease;
-  min-height:110px;
-  display:flex;
-  flex-direction:column;
-  justify-content:space-between;
+    background-color: var(--bg-color);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
 }
-.menu-card img {
-  width:100%;
-  height:100px;
-  object-fit:cover;
-  border-radius:8px;
-}
+
 .menu-card:hover {
-  transform:translateY(-6px);
-  box-shadow:0 12px 20px rgba(18,38,63,0.08);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
-.price-badge { font-weight:700; color:#198754; }
-.cart-sidebar { position:sticky; top:20px; }
-.small-muted { color:#6c757d; font-size:0.9rem; }
-.empty-state { color:#6c757d; }
-@media (max-width:991px){ .cart-sidebar{ position:static; margin-top:18px; } }
+
+.menu-image {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+}
+
+.menu-content {
+    padding: 16px;
+}
+
+.menu-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+}
+
+.menu-category {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-bottom: 12px;
+}
+
+.menu-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.menu-price {
+    font-weight: 700;
+    color: var(--accent-color);
+    font-size: 1.1rem;
+}
+
+.add-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.add-btn:hover {
+    background-color: #059669;
+}
+
+/* CART */
+.cart-container {
+    background-color: var(--bg-color);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 20px;
+}
+
+.cart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cart-title {
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.cart-count {
+    background-color: var(--page-bg);
+    color: var(--text-muted);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.cart-items {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+}
+
+.cart-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cart-item:last-child {
+    border-bottom: none;
+}
+
+.cart-item-info {
+    flex: 1;
+}
+
+.cart-item-name {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.cart-item-price {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.cart-item-quantity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quantity-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background-color: var(--page-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.quantity-btn:hover {
+    background-color: var(--border-color);
+}
+
+.cart-item-subtotal {
+    font-weight: 600;
+    margin-left: 12px;
+    min-width: 80px;
+    text-align: right;
+}
+
+.cart-remove {
+    color: var(--danger-color);
+    cursor: pointer;
+    margin-left: 8px;
+}
+
+.cart-empty {
+    text-align: center;
+    padding: 20px 0;
+    color: var(--text-muted);
+}
+
+.cart-summary {
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+}
+
+.cart-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.total-label {
+    font-weight: 600;
+}
+
+.total-amount {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--accent-color);
+}
+
+.cart-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #059669;
+}
+
+.btn-outline {
+    background-color: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.btn-outline:hover {
+    background-color: var(--page-bg);
+}
+
+/* PAYMENT MODAL */
+.modal-content {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-color);
+    padding: 16px 20px;
+}
+
+.modal-title {
+    font-weight: 600;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.payment-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.payment-label {
+    color: var(--text-muted);
+}
+
+.payment-value {
+    font-weight: 600;
+}
+
+.payment-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.payment-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-color);
+    padding: 16px 20px;
+}
+
+/* SUCCESS ALERT */
+.success-alert {
+    background-color: rgba(34, 197, 94, 0.1);
+    color: var(--success-color);
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* DARK MODE BUTTON */
+.dark-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 30px;
+    width: 60px;
+    height: 30px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 4px;
+    transition: background 0.3s, border-color 0.3s;
+    z-index: 1000;
+}
+
+.dark-toggle .circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    transition: transform 0.3s ease;
+}
+
+.dark .dark-toggle .circle {
+    transform: translateX(30px);
+}
+
+/* RESPONSIVE */
+@media (max-width: 991px) {
+    .cart-container {
+        position: static;
+        margin-top: 24px;
+    }
+    
+    .menu-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+}
+
+@media (max-width: 576px) {
+    .menu-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+    
+    .search-filter-container {
+        flex-direction: column;
+    }
+    
+    .search-input {
+        width: 100%;
+    }
+}
 </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-white bg-white shadow-sm mb-3">
-  <div class="container-fluid">
-    <div class="mb-3 d-block d-lg-none">
-      <button class="btn btn-outline-secondary btn-sm" onclick="window.location.href='pilih_meja.php'">
-        <i class="bi bi-arrow-left"></i> Kembali
-      </button>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center w-100">
+            <div class="d-flex align-items-center">
+                <button class="btn btn-outline btn-sm me-3 d-lg-none" onclick="window.location.href='pilih_meja.php'">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <a class="navbar-brand" href="dashboard.php">
+                    <i class="fas fa-utensils me-2"></i> Pecel Lele POS
+                </a>
+            </div>
+            <div class="user-info">
+                <div class="d-none d-md-block">
+                    <span class="text-muted">Halo, </span>
+                    <strong><?= htmlspecialchars($_SESSION['username']) ?></strong>
+                </div>
+                <?php if ($meja_id > 0): ?>
+                    <div class="table-badge">
+                        <i class="fas fa-chair me-1"></i> Meja #<?= $meja_id ?>
+                    </div>
+                <?php endif; ?>
+                <a href="report.php" class="btn btn-outline btn-sm">
+                    <i class="fas fa-file-alt"></i>
+                    <span class="d-none d-md-inline"> Laporan</span>
+                </a>
+                <a href="logout.php" class="btn btn-outline btn-sm">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span class="d-none d-md-inline"> Logout</span>
+                </a>
+            </div>
+        </div>
     </div>
-    <a class="navbar-brand" href="dashboard.php">🍽️ Pecel Lele POS</a>
-    <div class="d-flex align-items-center gap-2">
-      <div class="small-muted me-3">Halo, <strong><?= htmlspecialchars($_SESSION['username']) ?></strong></div>
-      <?php if ($meja_id > 0): ?>
-        <span class="badge bg-success">Meja #<?= $meja_id ?></span>
-      <?php endif; ?>
-      <a href="report.php" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-text"></i> Laporan</a>
-      <a href="logout.php" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i> Logout</a>
-    </div>
-  </div>
 </nav>
 
-<div class="container-fluid">
-  <div class="row gx-4">
-    <!-- MENU -->
-    <div class="col-lg-8">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">Menu</h5>
-        <div class="d-flex gap-2">
-          <input id="searchInput" class="form-control form-control-sm" style="min-width:220px" placeholder="Cari menu...">
-          <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="bi bi-funnel"></i> Kategori
-            </button>
-            <ul class="dropdown-menu p-2" style="min-width:240px;">
-              <button class="btn btn-sm btn-outline-secondary w-100 mb-2 category-filter" data-cat="all">Semua</button>
-              <?php foreach ($categories as $cat): ?>
-                <button class="btn btn-sm btn-outline-secondary w-100 mb-2 category-filter" data-cat="<?= htmlspecialchars($cat) ?>">
-                  <?= htmlspecialchars($cat) ?>
-                </button>
-              <?php endforeach; ?>
-            </ul>
-          </div>
-        </div>
-      </div>
+<!-- DARK MODE TOGGLE -->
+<div class="dark-toggle" id="darkToggle">
+    <div class="circle"></div>
+</div>
 
-      <div id="menuGrid" class="row g-3">
-        <?php foreach ($menus as $m): ?>
-          <div class="col-6 col-sm-4 col-md-3 menu-item" 
-               data-name="<?= htmlspecialchars(strtolower($m['name'])) ?>" 
-               data-category="<?= htmlspecialchars($m['category']) ?>">
-            <div class="menu-card" data-id="<?= $m['id'] ?>" data-name="<?= htmlspecialchars($m['name']) ?>" data-price="<?= $m['price'] ?>">
-              <?php if (!empty($m['image_url'])): ?>
-                <img src="<?= htmlspecialchars($m['image_url']) ?>" alt="<?= htmlspecialchars($m['name']) ?>">
-              <?php endif; ?>
-              <div>
-                <h6 class="mb-1"><?= htmlspecialchars($m['name']) ?></h6>
-                <div class="small-muted">ID: <?= $m['id'] ?> • <?= htmlspecialchars($m['category'] ?: '-') ?></div>
-              </div>
-              <div class="d-flex justify-content-between align-items-center mt-2">
-                <div class="price-badge">Rp <?= number_format($m['price'], 0, ",", ".") ?></div>
-                <div class="btn-group btn-group-sm">
-                  <button class="btn btn-outline-secondary btn-add" type="button"><i class="bi bi-plus-lg"></i></button>
+<!-- MAIN CONTENT -->
+<div class="main-container">
+    <div class="row">
+        <!-- MENU SECTION -->
+        <div class="col-lg-8">
+            <div class="page-header">
+                <h1 class="page-title">Menu</h1>
+                <p class="page-subtitle">Pilih menu yang ingin dipesan</p>
+            </div>
+
+            <div class="search-filter-container">
+                <input type="text" class="search-input" id="searchInput" placeholder="Cari menu...">
+                <div class="category-dropdown">
+                    <button class="category-btn" id="categoryBtn">
+                        <i class="fas fa-filter"></i>
+                        <span id="categoryText">Semua Kategori</span>
+                        <i class="fas fa-chevron-down ms-auto"></i>
+                    </button>
+                    <div class="category-menu" id="categoryMenu">
+                        <div class="category-item active" data-cat="all">Semua</div>
+                        <?php foreach ($categories as $cat): ?>
+                            <div class="category-item" data-cat="<?= htmlspecialchars($cat) ?>">
+                                <?= htmlspecialchars($cat) ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
-              </div>
             </div>
-          </div>
-        <?php endforeach; ?>
-      </div>
-    </div>
 
-    <!-- KERANJANG -->
-    <div class="col-lg-4">
-      <div class="cart-sidebar">
-        <div class="card shadow-sm">
-          <div class="card-body">
-            <h5 class="card-title">Keranjang <small class="small-muted" id="cartCount">0 item</small></h5>
+            <div class="menu-grid" id="menuGrid">
+                <?php foreach ($menus as $m): ?>
+                    <div class="menu-item" 
+                         data-name="<?= htmlspecialchars(strtolower($m['name'])) ?>" 
+                         data-category="<?= htmlspecialchars($m['category']) ?>">
+                        <div class="menu-card" data-id="<?= $m['id'] ?>" data-name="<?= htmlspecialchars($m['name']) ?>" data-price="<?= $m['price'] ?>">
+                            <?php if (!empty($m['image_url'])): ?>
+                                <img src="<?= htmlspecialchars($m['image_url']) ?>" alt="<?= htmlspecialchars($m['name']) ?>" class="menu-image">
+                            <?php else: ?>
+                                <div class="menu-image d-flex align-items-center justify-content-center bg-light">
+                                    <i class="fas fa-utensils fa-2x text-muted"></i>
+                                </div>
+                            <?php endif; ?>
+                            <div class="menu-content">
+                                <h5 class="menu-name"><?= htmlspecialchars($m['name']) ?></h5>
+                                <div class="menu-category"><?= htmlspecialchars($m['category'] ?: 'Tidak ada kategori') ?></div>
+                                <div class="menu-footer">
+                                    <div class="menu-price">Rp <?= number_format($m['price'], 0, ",", ".") ?></div>
+                                    <button class="add-btn">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
 
-            <?php if (!empty($success)): ?>
-              <div class="alert alert-success small mb-3">
-                <?= $success ?>
-                <?php if ($last_sale_id): ?>
-                  <div class="mt-2"><a href="cetak_struk.php?id=<?= $last_sale_id ?>" target="_blank" class="btn btn-sm btn-warning"><i class="bi bi-printer"></i> Cetak Struk</a></div>
+        <!-- CART SECTION -->
+        <div class="col-lg-4">
+            <div class="cart-container">
+                <div class="cart-header">
+                    <h3 class="cart-title">Keranjang</h3>
+                    <div class="cart-count" id="cartCount">0 item</div>
+                </div>
+
+                <?php if (!empty($success)): ?>
+                    <div class="success-alert">
+                        <i class="fas fa-check-circle"></i>
+                        <span><?= $success ?></span>
+                        <?php if ($last_sale_id): ?>
+                            <a href="cetak_struk.php?id=<?= $last_sale_id ?>" target="_blank" class="btn btn-sm btn-warning ms-auto">
+                                <i class="fas fa-print"></i> Cetak Struk
+                            </a>
+                        <?php endif; ?>
+                    </div>
                 <?php endif; ?>
-              </div>
-            <?php endif; ?>
 
-            <div id="cartItems" style="max-height:340px; overflow:auto;">
-              <p class="empty-state">Belum ada item</p>
+                <div class="cart-items" id="cartItems">
+                    <div class="cart-empty">
+                        <i class="fas fa-shopping-cart fa-2x mb-2"></i>
+                        <p>Belum ada item</p>
+                    </div>
+                </div>
+
+                <div class="cart-summary">
+                    <div class="cart-total">
+                        <div class="total-label">Total</div>
+                        <div class="total-amount">Rp <span id="grandTotal">0</span></div>
+                    </div>
+                    <div class="cart-actions">
+                        <button class="btn btn-primary flex-fill" id="openPayBtn" data-bs-toggle="modal" data-bs-target="#payModal">
+                            <i class="fas fa-money-bill-wave"></i> Bayar
+                        </button>
+                        <button class="btn btn-outline" id="clearCart">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
-            <hr>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div class="small-muted">Total</div>
-              <div><strong>Rp <span id="grandTotal">0</span></strong></div>
-            </div>
-            <div class="d-grid gap-2">
-              <button id="openPayBtn" class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#payModal"><i class="bi bi-currency-dollar"></i> Bayar</button>
-              <button id="clearCart" class="btn btn-outline-secondary" type="button"><i class="bi bi-trash"></i> Kosongkan</button>
-            </div>
-            <form method="post" id="cartForm" class="d-none">
-              <input type="hidden" name="bayar" value="1">
-            </form>
-          </div>
         </div>
-      </div>
     </div>
-  </div>
 </div>
 
-<!-- Modal Bayar -->
+<!-- PAYMENT MODAL -->
 <div class="modal fade" id="payModal" tabindex="-1" aria-labelledby="payModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-sm modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="payModalLabel">Pembayaran</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-2">
-          <label class="form-label small-muted">Total yang harus dibayar</label>
-          <div class="h5">Rp <span id="payTotal">0</span></div>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="payModalLabel">Pembayaran</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="payment-row">
+                    <div class="payment-label">Total yang harus dibayar</div>
+                    <div class="payment-value">Rp <span id="payTotal">0</span></div>
+                </div>
+                <div class="mb-3">
+                    <label for="cashInput" class="form-label">Tunai diterima</label>
+                    <input type="number" min="0" step="1" class="payment-input" id="cashInput" placeholder="Masukkan jumlah tunai">
+                </div>
+                <div class="payment-row">
+                    <div class="payment-label">Kembalian</div>
+                    <div class="payment-value">Rp <span id="changeOutput">0</span></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-primary" id="confirmPayBtn">Konfirmasi & Bayar</button>
+            </div>
         </div>
-        <div class="mb-2">
-          <label class="form-label">Tunai diterima</label>
-          <input type="number" min="0" step="1" class="form-control" id="cashInput" placeholder="Masukkan jumlah tunai">
-        </div>
-        <div class="mb-2">
-          <label class="form-label small-muted">Kembalian</label>
-          <div class="h6">Rp <span id="changeOutput">0</span></div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-        <button id="confirmPayBtn" class="btn btn-primary">Konfirmasi & Bayar</button>
-      </div>
     </div>
-  </div>
 </div>
+
+<form method="post" id="cartForm" class="d-none">
+    <input type="hidden" name="bayar" value="1">
+</form>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Dark mode toggle
+    const darkToggle = document.getElementById('darkToggle');
+    const body = document.body;
+    
+    // Cek preferensi dark mode dari localStorage
+    if (localStorage.getItem('dark-mode') === 'true') {
+        body.classList.add('dark');
+    }
+    
+    // Toggle dark mode
+    darkToggle.addEventListener('click', () => {
+        body.classList.toggle('dark');
+        localStorage.setItem('dark-mode', body.classList.contains('dark'));
+    });
+
+    // Category dropdown
+    const categoryBtn = document.getElementById('categoryBtn');
+    const categoryMenu = document.getElementById('categoryMenu');
+    const categoryText = document.getElementById('categoryText');
+    
+    categoryBtn.addEventListener('click', () => {
+        categoryMenu.classList.toggle('show');
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (!categoryBtn.contains(e.target) && !categoryMenu.contains(e.target)) {
+            categoryMenu.classList.remove('show');
+        }
+    });
+    
+    // Category filter
+    const categoryItems = document.querySelectorAll('.category-item');
+    categoryItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const cat = item.getAttribute('data-cat');
+            
+            // Update active state
+            categoryItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            
+            // Update button text
+            categoryText.textContent = cat === 'all' ? 'Semua Kategori' : item.textContent;
+            
+            // Filter menu items
+            if (cat === 'all') {
+                document.querySelectorAll('.menu-item').forEach(i => i.style.display = 'block');
+            } else {
+                document.querySelectorAll('.menu-item').forEach(i => {
+                    i.style.display = i.getAttribute('data-category') === cat ? 'block' : 'none';
+                });
+            }
+            
+            // Close dropdown
+            categoryMenu.classList.remove('show');
+        });
+    });
+});
+
+// Cart functionality
 let cart = {};
 function formatIDR(num){ return Number(num).toLocaleString('id-ID'); }
 
@@ -268,26 +869,28 @@ function renderCart(){
   let total = 0; let count = 0;
   for (let id in cart){
     const i = cart[id]; const sub = i.price * i.qty; total += sub; count += i.qty;
-    $c.append(`<div class="d-flex justify-content-between align-items-center mb-2">
-      <div style="flex:1"><strong>${i.name}</strong><br><div class="small-muted">Rp ${formatIDR(i.price)} x ${i.qty}</div></div>
-      <div class="text-end ms-2">
-        <div class="btn-group btn-group-sm mb-1">
-          <button class="btn btn-outline-secondary btn-decrease" data-id="${id}">-</button>
-          <button class="btn btn-outline-secondary btn-increase" data-id="${id}">+</button>
-        </div>
-        <div class="small-muted">Rp ${formatIDR(sub)}</div>
-        <div class="mt-1"><button class="btn btn-sm btn-link text-danger btn-remove" data-id="${id}">Hapus</button></div>
+    $c.append(`<div class="cart-item">
+      <div class="cart-item-info">
+        <div class="cart-item-name">${i.name}</div>
+        <div class="cart-item-price">Rp ${formatIDR(i.price)}</div>
       </div>
+      <div class="cart-item-quantity">
+        <button class="quantity-btn btn-decrease" data-id="${id}">-</button>
+        <span>${i.qty}</span>
+        <button class="quantity-btn btn-increase" data-id="${id}">+</button>
+      </div>
+      <div class="cart-item-subtotal">Rp ${formatIDR(sub)}</div>
+      <i class="fas fa-times cart-remove btn-remove" data-id="${id}"></i>
     </div>`);
   }
-  if(count===0){ $c.html('<p class="empty-state">Belum ada item</p>'); }
+  if(count===0){ $c.html('<div class="cart-empty"><i class="fas fa-shopping-cart fa-2x mb-2"></i><p>Belum ada item</p></div>'); }
   $('#grandTotal').text(formatIDR(total)); $('#payTotal').text(formatIDR(total)); $('#cartCount').text(count+' item');
   const $f = $('#cartForm'); $f.empty(); for(let id in cart){ $('<input>').attr({type:'hidden',name:'menu_id[]',value:id}).appendTo($f); $('<input>').attr({type:'hidden',name:'qty[]',value:cart[id].qty}).appendTo($f); }
   $('<input>').attr({type:'hidden',name:'bayar',value:'1'}).appendTo($f);
 }
 
-$(function(){
-  $('.btn-add, .menu-card').on('click',function(){
+ $(function(){
+  $('.add-btn, .menu-card').on('click',function(){
     const c=$(this).closest('.menu-card'); const id=c.data('id'),name=c.data('name'),price=parseFloat(c.data('price'));
     if(!cart[id])cart[id]={id,name,price,qty:1}; else cart[id].qty++; renderCart();
   });
@@ -296,7 +899,6 @@ $(function(){
   $(document).on('click','.btn-remove',function(){delete cart[$(this).data('id')];renderCart();});
   $('#clearCart').on('click',function(){if(confirm('Kosongkan keranjang?')){cart={};renderCart();}});
   $('#searchInput').on('input',function(){const q=$(this).val().trim().toLowerCase();$('.menu-item').each(function(){const n=$(this).data('name');$(this).toggle(n.indexOf(q)!==-1);});});
-  $('.category-filter').on('click',function(){const cat=$(this).data('cat');if(cat==='all')$('.menu-item').show();else $('.menu-item').each(function(){$(this).toggle($(this).data('category')===cat);});});
   $('#cashInput').on('input',function(){const cash=parseFloat($(this).val())||0,total=parseFloat($('#grandTotal').text().replace(/\./g,''))||0;$('#changeOutput').text(formatIDR(cash-total>0?cash-total:0));});
   $('#confirmPayBtn').on('click',function(){const total=parseFloat($('#grandTotal').text().replace(/\./g,''))||0;if(total<=0)return alert('Keranjang kosong.');
     const cash=parseFloat($('#cashInput').val())||0;if(cash<total&&!confirm('Tunai kurang, lanjutkan?'))return;$('#cartForm')[0].submit();});
