@@ -17,6 +17,11 @@ if (isset($_POST['bayar'])) {
     $user_id = intval($_SESSION['user_id']);
     $menu_ids = $_POST['menu_id'] ?? [];
     $qtys = $_POST['qty'] ?? [];
+    
+    // MODIFIKASI: Ambil data metode pembayaran dari form
+    $payment_method_post = $_POST['payment_method'] ?? 'cash';
+    $bank_name = $_POST['bank_name'] ?? '';
+    $account_number = $_POST['account_number'] ?? '';
 
     // Hitung total berdasarkan DB (keamanan)
     $total = 0.0;
@@ -33,9 +38,16 @@ if (isset($_POST['bayar'])) {
         $stmtp->close();
     }
 
+    // MODIFIKASI: Tentukan nilai akhir untuk kolom payment_method
+    // Jika metodenya transfer, gunakan nama bank yang dipilih
+    $payment_method_to_save = $payment_method_post;
+    if ($payment_method_post === 'transfer' && !empty($bank_name)) {
+        $payment_method_to_save = $bank_name; // Contoh: 'bca', 'bri'
+    }
+
     // Simpan sales
-    $ins = $conn->prepare("INSERT INTO sales (user_id, total) VALUES (?, ?)");
-    $ins->bind_param("id", $user_id, $total);
+    $ins = $conn->prepare("INSERT INTO sales (user_id, total, payment_method) VALUES (?, ?, ?)");
+$ins->bind_param("ids", $user_id, $total, $payment_method_to_save);
     $ins->execute();
     $sale_id = $ins->insert_id;
     $ins->close();
@@ -549,6 +561,101 @@ body {
     padding: 16px 20px;
 }
 
+/* PAYMENT METHOD SELECTION */
+.payment-method-container {
+    margin-bottom: 20px;
+}
+
+.payment-method-title {
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.payment-method-options {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.payment-method-option {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.payment-method-option:hover {
+    border-color: var(--accent-color);
+}
+
+.payment-method-option.active {
+    border-color: var(--accent-color);
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.payment-method-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: var(--accent-color);
+}
+
+.payment-method-name {
+    font-weight: 600;
+}
+
+/* PAYMENT DETAILS */
+.payment-details {
+    margin-top: 20px;
+    padding: 16px;
+    border-radius: 8px;
+    background-color: var(--page-bg);
+    display: none;
+}
+
+.payment-details.active {
+    display: block;
+}
+
+.qris-container {
+    text-align: center;
+}
+
+.qris-image {
+    max-width: 200px;
+    margin: 16px auto;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.qris-instruction {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-top: 8px;
+}
+
+.bank-options {
+    margin-bottom: 16px;
+}
+
+.bank-select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin-bottom: 16px;
+}
+
+.bank-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
 /* SUCCESS ALERT */
 .success-alert {
     background-color: rgba(34, 197, 94, 0.1);
@@ -615,8 +722,33 @@ body {
     .search-input {
         width: 100%;
     }
+    
+    .payment-method-options {
+        flex-direction: column;
+    }
 }
 </style>
+<style>
+.payment-method-option {
+  text-align: center;
+  cursor: pointer;
+  padding: 15px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  transition: 0.3s;
+}
+.payment-method-option:hover {
+  border-color: #0d6efd;
+  background: #eef5ff;
+}
+.payment-method-option.active {
+  border-color: #0d6efd;
+  background: #e0edff;
+}
+.payment-details { display: none; }
+.payment-details.active { display: block; }
+</style>
+
 </head>
 <body>
 
@@ -766,58 +898,135 @@ body {
 
 <!-- PAYMENT MODAL -->
 <div class="modal fade" id="payModal" tabindex="-1" aria-labelledby="payModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="payModalLabel">Pembayaran</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="payment-row">
-                    <div class="payment-label">Total yang harus dibayar</div>
-                    <div class="payment-value">Rp <span id="payTotal">0</span></div>
-                </div>
-                <div class="mb-3">
-                    <label for="cashInput" class="form-label">Tunai diterima</label>
-                    <input type="number" min="0" step="1" class="payment-input" id="cashInput" placeholder="Masukkan jumlah tunai">
-                </div>
-                <div class="payment-row">
-                    <div class="payment-label">Kembalian</div>
-                    <div class="payment-value">Rp <span id="changeOutput">0</span></div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline" data-bs-dismiss="modal">Batal</button>
-                <button type="button" class="btn btn-primary" id="confirmPayBtn">Konfirmasi & Bayar</button>
-            </div>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow-lg border-0 rounded-4">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="payModalLabel">Pembayaran</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="payment-row mb-3">
+          <div class="fw-bold">Total yang harus dibayar:</div>
+          <div class="fs-4 text-success">Rp <span id="payTotal">0</span></div>
         </div>
+
+        <!-- Pilihan Metode Pembayaran -->
+        <div class="payment-method-container mb-4">
+          <div class="payment-method-title fw-semibold mb-2">Pilih Metode Pembayaran</div>
+          <div class="d-flex justify-content-around">
+            <div class="payment-method-option active" data-method="cash">
+              <i class="fas fa-money-bill-wave fa-2x text-success"></i>
+              <div class="mt-2">Tunai</div>
+            </div>
+            <div class="payment-method-option" data-method="xendit">
+              <i class="fas fa-credit-card fa-2x text-primary"></i>
+              <div class="mt-2">Bayar via Xendit</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tunai -->
+        <div class="payment-details active" id="cashDetails">
+          <div class="mb-3">
+            <label for="cashInput" class="form-label">Tunai diterima</label>
+            <input type="number" min="0" class="form-control" id="cashInput" placeholder="Masukkan jumlah tunai">
+          </div>
+          <div class="payment-row">
+            <div class="fw-semibold">Kembalian:</div>
+            <div class="fs-5 text-danger">Rp <span id="changeOutput">0</span></div>
+          </div>
+        </div>
+
+        <!-- Xendit -->
+        <div class="payment-details" id="xenditDetails">
+          <p class="text-muted">Klik tombol di bawah untuk membayar melalui Xendit.</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary" id="confirmPayBtn">Konfirmasi & Bayar</button>
+      </div>
     </div>
+  </div>
 </div>
 
+<!-- FORM -->
 <form method="post" id="cartForm" class="d-none">
-    <input type="hidden" name="bayar" value="1">
+  <input type="hidden" name="bayar" value="1">
+  <input type="hidden" name="payment_method" id="paymentMethodInput" value="cash">
 </form>
+
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+  const options = document.querySelectorAll('.payment-method-option');
+  const paymentMethodInput = document.getElementById('paymentMethodInput');
+  const cashDetails = document.getElementById('cashDetails');
+  const xenditDetails = document.getElementById('xenditDetails');
+  const cashInput = document.getElementById('cashInput');
+  const payTotal = document.getElementById('payTotal');
+  const changeOutput = document.getElementById('changeOutput');
+  const confirmPayBtn = document.getElementById('confirmPayBtn');
+
+  // Contoh total bayar (nanti bisa diganti dari PHP)
+  let totalBayar = 50000;
+  payTotal.textContent = totalBayar.toLocaleString('id-ID');
+
+  options.forEach(opt => {
+    opt.addEventListener('click', () => {
+      options.forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      const method = opt.dataset.method;
+      paymentMethodInput.value = method;
+
+      cashDetails.classList.toggle('active', method === 'cash');
+      xenditDetails.classList.toggle('active', method === 'xendit');
+    });
+  });
+
+  cashInput.addEventListener('input', () => {
+    const tunai = parseFloat(cashInput.value) || 0;
+    const kembalian = tunai - totalBayar;
+    changeOutput.textContent = (kembalian > 0 ? kembalian : 0).toLocaleString('id-ID');
+  });
+
+  confirmPayBtn.addEventListener('click', async () => {
+    const method = paymentMethodInput.value;
+
+    if (method === 'cash') {
+      alert('Pembayaran tunai berhasil!');
+      document.getElementById('cartForm').submit();
+    } else if (method === 'xendit') {
+      // Arahkan ke proses PHP Xendit
+      window.location.href = 'xendit_payment.php?amount=' + totalBayar;
+    }
+  });
+});
+</script>
+
+<script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Dark mode toggle
+    // ========================
+    // 🌙 DARK MODE TOGGLE
+    // ========================
     const darkToggle = document.getElementById('darkToggle');
     const body = document.body;
     
-    // Cek preferensi dark mode dari localStorage
     if (localStorage.getItem('dark-mode') === 'true') {
         body.classList.add('dark');
     }
     
-    // Toggle dark mode
     darkToggle.addEventListener('click', () => {
         body.classList.toggle('dark');
         localStorage.setItem('dark-mode', body.classList.contains('dark'));
     });
 
-    // Category dropdown
+    // ========================
+    // 📂 CATEGORY DROPDOWN
+    // ========================
     const categoryBtn = document.getElementById('categoryBtn');
     const categoryMenu = document.getElementById('categoryMenu');
     const categoryText = document.getElementById('categoryText');
@@ -832,77 +1041,219 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Category filter
+    // ========================
+    // 🧩 CATEGORY FILTER
+    // ========================
     const categoryItems = document.querySelectorAll('.category-item');
+
     categoryItems.forEach(item => {
         item.addEventListener('click', () => {
             const cat = item.getAttribute('data-cat');
             
-            // Update active state
             categoryItems.forEach(i => i.classList.remove('active'));
             item.classList.add('active');
             
-            // Update button text
             categoryText.textContent = cat === 'all' ? 'Semua Kategori' : item.textContent;
             
-            // Filter menu items
-            if (cat === 'all') {
-                document.querySelectorAll('.menu-item').forEach(i => i.style.display = 'block');
-            } else {
-                document.querySelectorAll('.menu-item').forEach(i => {
-                    i.style.display = i.getAttribute('data-category') === cat ? 'block' : 'none';
-                });
-            }
+            document.querySelectorAll('.menu-item').forEach(i => {
+                i.style.display = (cat === 'all' || i.getAttribute('data-category') === cat)
+                    ? 'block'
+                    : 'none';
+            });
             
-            // Close dropdown
             categoryMenu.classList.remove('show');
+        });
+    });
+    
+    // ========================
+    // 💳 PAYMENT METHOD SELECTION
+    // ========================
+    const paymentMethodOptions = document.querySelectorAll('.payment-method-option');
+    const cashDetails = document.getElementById('cashDetails');
+    const qrisDetails = document.getElementById('qrisDetails');
+    const transferDetails = document.getElementById('transferDetails');
+    const paymentMethodInput = document.getElementById('paymentMethodInput');
+    
+    paymentMethodOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const method = option.getAttribute('data-method');
+            
+            // Update active state
+            paymentMethodOptions.forEach(opt => opt.classList.remove('active'));
+            option.classList.add('active');
+            
+            // Hide all payment details
+            cashDetails.classList.remove('active');
+            qrisDetails.classList.remove('active');
+            transferDetails.classList.remove('active');
+            
+            // Show relevant payment details
+            if (method === 'cash') {
+                cashDetails.classList.add('active');
+                paymentMethodInput.value = 'cash';
+            } else if (method === 'qris') {
+                qrisDetails.classList.add('active');
+                paymentMethodInput.value = 'qris';
+            } else if (method === 'transfer') {
+                transferDetails.classList.add('active');
+                // MODIFIKASI: Set nilai awal 'transfer', akan diupdate saat bank dipilih
+                paymentMethodInput.value = 'transfer'; 
+            }
         });
     });
 });
 
-// Cart functionality
-let cart = {};
-function formatIDR(num){ return Number(num).toLocaleString('id-ID'); }
 
-function renderCart(){
-  let $c = $('#cartItems'); $c.empty();
-  let total = 0; let count = 0;
-  for (let id in cart){
-    const i = cart[id]; const sub = i.price * i.qty; total += sub; count += i.qty;
-    $c.append(`<div class="cart-item">
-      <div class="cart-item-info">
-        <div class="cart-item-name">${i.name}</div>
-        <div class="cart-item-price">Rp ${formatIDR(i.price)}</div>
-      </div>
-      <div class="cart-item-quantity">
-        <button class="quantity-btn btn-decrease" data-id="${id}">-</button>
-        <span>${i.qty}</span>
-        <button class="quantity-btn btn-increase" data-id="${id}">+</button>
-      </div>
-      <div class="cart-item-subtotal">Rp ${formatIDR(sub)}</div>
-      <i class="fas fa-times cart-remove btn-remove" data-id="${id}"></i>
-    </div>`);
-  }
-  if(count===0){ $c.html('<div class="cart-empty"><i class="fas fa-shopping-cart fa-2x mb-2"></i><p>Belum ada item</p></div>'); }
-  $('#grandTotal').text(formatIDR(total)); $('#payTotal').text(formatIDR(total)); $('#cartCount').text(count+' item');
-  const $f = $('#cartForm'); $f.empty(); for(let id in cart){ $('<input>').attr({type:'hidden',name:'menu_id[]',value:id}).appendTo($f); $('<input>').attr({type:'hidden',name:'qty[]',value:cart[id].qty}).appendTo($f); }
-  $('<input>').attr({type:'hidden',name:'bayar',value:'1'}).appendTo($f);
+// ========================
+// 🛒 CART FUNCTIONALITY
+// ========================
+let cart = {};
+
+function formatIDR(num) {
+    return Number(num).toLocaleString('id-ID');
 }
 
- $(function(){
-  $('.add-btn, .menu-card').on('click',function(){
-    const c=$(this).closest('.menu-card'); const id=c.data('id'),name=c.data('name'),price=parseFloat(c.data('price'));
-    if(!cart[id])cart[id]={id,name,price,qty:1}; else cart[id].qty++; renderCart();
-  });
-  $(document).on('click','.btn-increase',function(){const id=$(this).data('id');cart[id].qty++;renderCart();});
-  $(document).on('click','.btn-decrease',function(){const id=$(this).data('id');cart[id].qty--;if(cart[id].qty<=0)delete cart[id];renderCart();});
-  $(document).on('click','.btn-remove',function(){delete cart[$(this).data('id')];renderCart();});
-  $('#clearCart').on('click',function(){if(confirm('Kosongkan keranjang?')){cart={};renderCart();}});
-  $('#searchInput').on('input',function(){const q=$(this).val().trim().toLowerCase();$('.menu-item').each(function(){const n=$(this).data('name');$(this).toggle(n.indexOf(q)!==-1);});});
-  $('#cashInput').on('input',function(){const cash=parseFloat($(this).val())||0,total=parseFloat($('#grandTotal').text().replace(/\./g,''))||0;$('#changeOutput').text(formatIDR(cash-total>0?cash-total:0));});
-  $('#confirmPayBtn').on('click',function(){const total=parseFloat($('#grandTotal').text().replace(/\./g,''))||0;if(total<=0)return alert('Keranjang kosong.');
-    const cash=parseFloat($('#cashInput').val())||0;if(cash<total&&!confirm('Tunai kurang, lanjutkan?'))return;$('#cartForm')[0].submit();});
-  renderCart();
+function renderCart() {
+    let $c = $('#cartItems');
+    $c.empty();
+
+    let total = 0;
+    let count = 0;
+
+    for (let id in cart) {
+        const i = cart[id];
+        const sub = i.price * i.qty;
+        total += sub;
+        count += i.qty;
+
+        $c.append(`
+            <div class="cart-item">
+                <div class="cart-item-info">
+                    <div class="cart-item-name">${i.name}</div>
+                    <div class="cart-item-price">Rp ${formatIDR(i.price)}</div>
+                </div>
+                <div class="cart-item-quantity">
+                    <button class="quantity-btn btn-decrease" data-id="${id}">-</button>
+                    <span>${i.qty}</span>
+                    <button class="quantity-btn btn-increase" data-id="${id}">+</button>
+                </div>
+                <div class="cart-item-subtotal">Rp ${formatIDR(sub)}</div>
+                <i class="fas fa-times cart-remove btn-remove" data-id="${id}"></i>
+            </div>
+        `);
+    }
+
+    if (count === 0) {
+        $c.html(`
+            <div class="cart-empty">
+                <i class="fas fa-shopping-cart fa-2x mb-2"></i>
+                <p>Belum ada item</p>
+            </div>
+        `);
+    }
+
+    $('#grandTotal').text(formatIDR(total));
+    $('#payTotal').text(formatIDR(total));
+    $('#cartCount').text(count + ' item');
+
+    const $f = $('#cartForm');
+    $f.empty();
+
+    for (let id in cart) {
+        $('<input>').attr({ type: 'hidden', name: 'menu_id[]', value: id }).appendTo($f);
+        $('<input>').attr({ type: 'hidden', name: 'qty[]', value: cart[id].qty }).appendTo($f);
+    }
+
+    $('<input>').attr({ type: 'hidden', name: 'bayar', value: '1' }).appendTo($f);
+    $('<input>').attr({ type: 'hidden', name: 'payment_method', id: 'paymentMethodInput', value: 'cash' }).appendTo($f);
+    $('<input>').attr({ type: 'hidden', name: 'bank_name', id: 'bankNameInput', value: '' }).appendTo($f);
+    $('<input>').attr({ type: 'hidden', name: 'account_number', id: 'accountNumberInput', value: '' }).appendTo($f);
+}
+
+
+// ========================
+// ⚙️ EVENT HANDLERS (JQUERY)
+// ========================
+ $(function() {
+
+    // Tambah item ke keranjang
+    $('.add-btn, .menu-card').on('click', function() {
+        const c = $(this).closest('.menu-card');
+        const id = c.data('id');
+        const name = c.data('name');
+        const price = parseFloat(c.data('price'));
+
+        if (!cart[id]) cart[id] = { id, name, price, qty: 1 };
+        else cart[id].qty++;
+
+        renderCart();
+    });
+
+    // Tombol tambah jumlah
+    $(document).on('click', '.btn-increase', function() {
+        const id = $(this).data('id');
+        cart[id].qty++;
+        renderCart();
+    });
+
+    // Tombol kurangi jumlah
+    $(document).on('click', '.btn-decrease', function() {
+        const id = $(this).data('id');
+        cart[id].qty--;
+        if (cart[id].qty <= 0) delete cart[id];
+        renderCart();
+    });
+
+    // Hapus item dari keranjang
+    $(document).on('click', '.btn-remove', function() {
+        delete cart[$(this).data('id')];
+        renderCart();
+    });
+
+    // Kosongkan keranjang
+    $('#clearCart').on('click', function() {
+        if (confirm('Kosongkan keranjang?')) {
+            cart = {};
+            renderCart();
+        }
+    });
+
+    // Pencarian menu
+    $('#searchInput').on('input', function() {
+        const q = $(this).val().trim().toLowerCase();
+        $('.menu-item').each(function() {
+            const n = $(this).data('name').toLowerCase();
+            $(this).toggle(n.includes(q));
+        });
+    });
+
+    // Hitung kembalian otomatis
+    $('#cashInput').on('input', function() {
+        const cash = parseFloat($(this).val()) || 0;
+        const total = parseFloat($('#grandTotal').text().replace(/\./g, '')) || 0;
+        const change = cash - total > 0 ? cash - total : 0;
+        $('#changeOutput').text(formatIDR(change));
+    });
+
+    // MODIFIKASI: Update payment method saat bank dipilih
+    $('#bankSelect').on('change', function() {
+        const selectedBank = $(this).val();
+        $('#bankNameInput').val(selectedBank); // Untuk form submission
+        
+        // Ini adalah kunci perubahan: update payment method utama
+        if (selectedBank) {
+            $('#paymentMethodInput').val(selectedBank); // e.g., 'bca'
+        } else {
+            $('#paymentMethodInput').val('transfer'); // Kembali ke default jika tidak ada yang dipilih
+        }
+    });
+
+    // Update account number when input changes
+    $('#accountNumber').on('input', function() {
+        $('#accountNumberInput').val($(this).val());
+    });
+
+    renderCart();
 });
 </script>
 </body>
